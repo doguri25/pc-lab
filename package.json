@@ -1,0 +1,17 @@
+{
+  "name": "pc-lab-simulator",
+  "version": "2.3.0",
+  "private": true,
+  "description": "Offline-first point-and-click PC assembly learning game",
+  "scripts": {
+    "start": "node server.cjs",
+    "test": "node --test tests/*.test.cjs",
+    "build": "node build.cjs",
+    "prestart": "node build.cjs",
+    "release": "node scripts/release.cjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED"
+}
