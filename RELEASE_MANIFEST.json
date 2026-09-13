@@ -1,0 +1,18 @@
+{
+  "version": "2.3.0",
+  "releaseDate": "2026-09-14",
+  "timezone": "Asia/Seoul",
+  "buildId": "2.3.0-61f4d108c72f",
+  "status": "stable-local",
+  "scopeNote": "로컬 학습용 PC 조립 시뮬레이터. 모든 개별 제품의 정밀 실물 치수·벤치마크·가격을 자동 최신화하는 서비스는 아님.",
+  "standalone": "PC_LAB_v2.3.0.html",
+  "storageSchema": 1,
+  "storageIsolation": "per release + application directory; explicit migration only",
+  "audio": "original procedural Web Audio, no external sound files",
+  "generatedFiles": [
+    "src/release.js",
+    "CHANGELOG.md",
+    "dist/index.html"
+  ],
+  "sourceHash": "61f4d108c72f"
+}
