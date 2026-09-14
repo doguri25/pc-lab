@@ -1,4 +1,4 @@
-name: Deploy PC LAB v2.3.4 to GitHub Pages
+name: Deploy PC LAB v2.3.5 to GitHub Pages
 
 on:
   push:
@@ -21,31 +21,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Fetch current intermediate v2.3.4 Pages bundle
+      - name: Fetch current verified final v2.3.4 Pages bundle
         shell: bash
         run: |
           set -euo pipefail
           curl -fsSL --retry 5 --retry-delay 2 "https://doguri25.github.io/pc-lab/?pc_lab_base=v234-final-${GITHUB_SHA}" -o /tmp/pc-lab.html
           grep -q 'PC LAB v2.3.4' /tmp/pc-lab.html
-          grep -q '2.3.4-3f78610b1dc0' /tmp/pc-lab.html
-
-      - name: Apply frozen final v2.3.4 patch
-        shell: bash
-        run: |
-          set -euo pipefail
-          python scripts/patch-pages-v234-final.py /tmp/pc-lab.html
-          grep -q 'PC LAB v2.3.4' /tmp/pc-lab.html
           grep -q '2.3.4-4490bd72e3c7' /tmp/pc-lab.html
           grep -q '나사 제거됨 · 빈 나사 구멍' /tmp/pc-lab.html
           grep -q 'pc-lab-v234-focus-fix' /tmp/pc-lab.html
-          if grep -q 'translate(36 -59) rotate(-24 125 132)' /tmp/pc-lab.html; then
-            echo 'Old released-screw lens representation is still present.' >&2
-            exit 1
-          fi
+
+      - name: Apply v2.3.5 header inset patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/patch-pages-v235.py /tmp/pc-lab.html
+          grep -q 'PC LAB v2.3.5' /tmp/pc-lab.html
+          grep -q '2.3.5-652ba33c4b49' /tmp/pc-lab.html
+          grep -q 'pc-lab-v235-focus-inset-fix' /tmp/pc-lab.html
+          grep -q 'padding:5px 8px 10px' /tmp/pc-lab.html
+          grep -q '나사 제거됨 · 빈 나사 구멍' /tmp/pc-lab.html
           rm -rf _site
           mkdir -p _site
           cp /tmp/pc-lab.html _site/index.html
-          printf 'PC LAB v2.3.4\nBuild 2.3.4-4490bd72e3c7\n' > _site/version.txt
+          printf 'PC LAB v2.3.5\nBuild 2.3.5-652ba33c4b49\n' > _site/version.txt
           touch _site/.nojekyll
 
       - name: Configure Pages
