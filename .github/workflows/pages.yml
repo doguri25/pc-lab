@@ -21,55 +21,59 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Rebuild and verify standalone PC LAB v2.3.0
+      - name: Rebuild verified PC LAB v2.3.0 base
         shell: bash
         run: |
           set -euo pipefail
-          test -d pages-archive
-
-          # part-15 was damaged during the original connector upload.
-          # Its four verified 3 KB fragments are intact and reconstruct the
-          # canonical 12 KB part exactly.
           cat pages-archive/part-15a0.b64 pages-archive/part-15a1.b64 pages-archive/part-15a2.b64 pages-archive/part-15a3.b64 > /tmp/part-15.b64
           test "$(wc -c < /tmp/part-15.b64)" -eq 12000
           test "$(git hash-object /tmp/part-15.b64)" = "c183c947f7f04d86cc742ebdd4fc9cebae0c1011"
+          : > /tmp/base.b64
+          for n in $(seq -w 0 14); do cat "pages-archive/part-${n}.b64" >> /tmp/base.b64; done
+          cat /tmp/part-15.b64 >> /tmp/base.b64
+          for n in $(seq -w 16 20); do cat "pages-archive/part-${n}.b64" >> /tmp/base.b64; done
+          tr -d '\r\n\t ' < /tmp/base.b64 > /tmp/base.clean.b64
+          mv /tmp/base.clean.b64 /tmp/base.b64
+          test "$(wc -c < /tmp/base.b64)" -eq 243136
+          echo "026ac6f228345ef8e26b70ddbd307980568e3f115fd93d75009838fbbd3e9696  /tmp/base.b64" | sha256sum -c -
+          base64 --decode /tmp/base.b64 > /tmp/base.xz
+          echo "a761d59037e27c11426c1fa2ac6afe0537a9991d1e64295a255f49a9471e5660  /tmp/base.xz" | sha256sum -c -
+          xz --test /tmp/base.xz
+          xz --decompress --stdout /tmp/base.xz > /tmp/pc-lab.html
 
-          : > /tmp/pc-lab-pages.b64
-          for n in $(seq -w 0 14); do
-            f="pages-archive/part-${n}.b64"
-            test -f "$f"
-            cat "$f" >> /tmp/pc-lab-pages.b64
-          done
-          cat /tmp/part-15.b64 >> /tmp/pc-lab-pages.b64
-          for n in $(seq -w 16 20); do
-            f="pages-archive/part-${n}.b64"
-            test -f "$f"
-            cat "$f" >> /tmp/pc-lab-pages.b64
-          done
-          tr -d '\r\n\t ' < /tmp/pc-lab-pages.b64 > /tmp/pc-lab-pages.clean.b64
-          mv /tmp/pc-lab-pages.clean.b64 /tmp/pc-lab-pages.b64
-
-          chars=$(wc -c < /tmp/pc-lab-pages.b64)
-          echo "Base64 chars: $chars"
-          test "$chars" -eq 243136
-          echo "026ac6f228345ef8e26b70ddbd307980568e3f115fd93d75009838fbbd3e9696  /tmp/pc-lab-pages.b64" | sha256sum -c -
-
-          base64 --decode /tmp/pc-lab-pages.b64 > /tmp/pc-lab-pages.xz
-          echo "a761d59037e27c11426c1fa2ac6afe0537a9991d1e64295a255f49a9471e5660  /tmp/pc-lab-pages.xz" | sha256sum -c -
-          xz --test /tmp/pc-lab-pages.xz
-          xz --decompress --stdout /tmp/pc-lab-pages.xz > /tmp/pc-lab-pages.html
-
-          bytes=$(wc -c < /tmp/pc-lab-pages.html)
-          echo "HTML bytes: $bytes"
-          test "$bytes" -eq 755018
-          echo "706fb18c30d5055be975825d7659c55f9d79eb699d2dc062a6deb8d9936a2d27  /tmp/pc-lab-pages.html" | sha256sum -c -
-          grep -q 'PC LAB' /tmp/pc-lab-pages.html
-          grep -q 'v2.3.0' /tmp/pc-lab-pages.html
-
+      - name: Apply v2.3.1 fastener and popup patch
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          p=Path('/tmp/pc-lab.html');s=p.read_text()
+          def rep(old,new,name):
+              global s
+              n=s.count(old)
+              if n!=1: raise SystemExit(f'{name}: expected 1 match, got {n}')
+              s=s.replace(old,new,1)
+          rep('<title>PC LAB v2.3.0 — 컴퓨터 조립 시뮬레이터</title><meta name="pc-lab-version" content="2.3.0"><meta name="pc-lab-build" content="2.3.0-61f4d108c72f">','<title>PC LAB v2.3.1 — 컴퓨터 조립 시뮬레이터</title><meta name="pc-lab-version" content="2.3.1"><meta name="pc-lab-build" content="2.3.1-16f28c8f0c60">','meta')
+          rep('function screw(x,y,on=true){return `<circle cx="${x}" cy="${y}" r="4" fill="${on?\'#7e9291\':\'#131f23\'}" stroke="#263f43"/><path d="M${x-2} ${y}h4m-2-2v4" stroke="${on?\'#1c292c\':\'#31454a\'}" stroke-width="1"/>`;}','function screw(x,y,on=true){if(!on)return `<circle cx="${x}" cy="${y}" r="4.2" fill="#07161c" stroke="#40565b"/><circle cx="${x}" cy="${y}" r="2.25" fill="#02090d"/>`;return `<circle cx="${x}" cy="${y}" r="4" fill="#7e9291" stroke="#263f43"/><path d="M${x-2} ${y}h4m-2-2v4" stroke="#1c292c" stroke-width="1"/>`;}', 'art screw')
+          rep("function duration(){return profile.settings.motion&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches?850:80;}\nasync function physicalChange(fn,{kind='touch',element=null,slot=null,wasOn=false,done=null}={}){", "function duration(){return profile.settings.motion&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches?850:80;}\nfunction refreshPrecisionSurface(){\n const r=profile.current,lens=$('.precision-lens'),canvas=$('.direct-canvas');\n if(!r||!ui.precision||!lens){render();return;}\n if(canvas)canvas.innerHTML=H.scene(r,{selected:ui.slot,mode:'flat'},ui);\n const wrap=document.createElement('template');wrap.innerHTML=H.lens(r,ui.precision).trim();const fresh=wrap.content.firstElementChild;\n if(fresh){lens.innerHTML=fresh.innerHTML;lens.setAttribute('aria-label',fresh.getAttribute('aria-label')||'정밀 확대 조작');}\n}\nfunction refreshCableDialog(id){const scene=$('.cable-popup-scene');if(scene&&profile.current){scene.innerHTML=H.cableScene(profile.current,id);return;}cableDialog(id);}\nasync function physicalChange(fn,{kind='touch',element=null,slot=null,wasOn=false,done=null,refresh='render'}={}){", 'refresh helpers')
+          rep(" }finally{ui.busy=false;document.body.classList.remove('physical-busy');render();toast(result.message);}\n return true;\n}", " }finally{ui.busy=false;document.body.classList.remove('physical-busy');if(refresh==='precision')refreshPrecisionSurface();else if(refresh!=='none')render();toast(result.message);}\n return true;\n}", 'precision refresh')
+          rep(" physicalChange(fn,{kind:c.style==='screw'?'screw':'latch',wasOn:actual.on});\n}", " physicalChange(fn,{kind:c.style==='screw'?'screw':'latch',wasOn:actual.on,refresh:'precision'});\n}", 'precision commit')
+          rep("case 'physical-connect':{const target=el.dataset.target||null;if(!target&&!r.cables[id]){toast('이 플러그는 이미 분리되어 있습니다.');break;}const res=E.connect(r,id,r.cables[id]===target?null:target);if(res.ok){save();SFX.play('cable');toast(res.message);cableDialog(id);}else{SFX.play('warning');toast(res.message,true);}break;}", "case 'physical-connect':{const target=el.dataset.target||null;if(!target&&!r.cables[id]){toast('이 플러그는 이미 분리되어 있습니다.');break;}const res=E.connect(r,id,r.cables[id]===target?null:target);if(res.ok){save();SFX.play('cable');toast(res.message);refreshCableDialog(id);}else{SFX.play('warning');toast(res.message,true);}break;}", 'cable refresh')
+          entry={"version":"2.3.1","date":"2026-09-14","timezone":"Asia/Seoul","channel":"stable-local","title":"나사 분리 시각 상태·정밀 팝업 깜빡임 수정","changes":["나사를 풀었을 때 논리 상태는 해제됐지만 본체 그림에 나사 머리가 다시 나타나던 표현 오류를 수정하고, 풀린 위치는 나사 구멍으로 표시","나사·걸쇠 조작 뒤 작업대 전체를 다시 렌더링하지 않고 정밀 확대창과 해당 작업면만 제자리 갱신하도록 변경하여 팝업 재등장·깜빡임 제거","정밀 확대창에서 풀린 나사는 분리된 위치에 그대로 유지하고 상태 문구와 실제 작업면의 느슨한 고정부 표시를 동시에 갱신","케이블/커넥터 연결·분리 뒤 모달 전체를 다시 열지 않고 커넥터 그림 영역만 갱신하도록 변경하여 배경과 팝업의 깜빡임 제거","기존 고정부·분해·저장 규칙 회귀검사와 Chromium 팝업 DOM 유지 검사를 추가 검증"],"scopeNote":"로컬 학습용 PC 조립 시뮬레이터. 고정부 표현은 초보자 학습을 위한 도식이며 실제 제조사 서비스 도면의 정밀 위치를 뜻하지 않음."}
+          marker='</script><script>\n/* PC LAB content pack 0.1.0.'
+          j=json.dumps(entry,ensure_ascii=False,separators=(',',':'))
+          inject="</script><script>\nwindow.PCRelease.version='2.3.1';window.PCRelease.date='2026-09-14';window.PCRelease.buildId='2.3.1-16f28c8f0c60';window.PCRelease.title="+json.dumps(entry['title'],ensure_ascii=False)+";window.PCRelease.changes="+json.dumps(entry['changes'],ensure_ascii=False)+";window.PCRelease.scopeNote="+json.dumps(entry['scopeNote'],ensure_ascii=False)+";window.PCRelease.history=["+j+",...window.PCRelease.history];\n</script><script>\n/* PC LAB content pack 0.1.0."
+          rep(marker,inject,'release override')
+          p.write_text(s)
+          PY
+          grep -q 'PC LAB v2.3.1' /tmp/pc-lab.html
+          grep -q 'refreshPrecisionSurface' /tmp/pc-lab.html
+          grep -q 'refreshCableDialog' /tmp/pc-lab.html
+          grep -q '2.3.1-16f28c8f0c60' /tmp/pc-lab.html
           rm -rf _site
           mkdir -p _site
-          cp /tmp/pc-lab-pages.html _site/index.html
-          printf 'PC LAB v2.3.0\n' > _site/version.txt
+          cp /tmp/pc-lab.html _site/index.html
+          printf 'PC LAB v2.3.1\n' > _site/version.txt
           touch _site/.nojekyll
 
       - name: Configure Pages
