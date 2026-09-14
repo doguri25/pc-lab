@@ -1,0 +1,106 @@
+name: Verify and deploy PC LAB v2.3.0
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/pages-salvage-verified.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-v230-verified
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Recover interrupted XZ payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import base64
+          parts = sorted(Path('source-archive').glob('part-*.b64'))
+          if not parts:
+              raise SystemExit('source archive parts missing')
+          b64 = ''.join(''.join(p.read_text().split()) for p in parts)
+          b64 = b64[:len(b64) - (len(b64) % 4)]
+          Path('/tmp/source.tar.xz').write_bytes(base64.b64decode(b64))
+          print('parts', len(parts), 'chars', len(b64))
+          PY
+          set +e
+          xz -dc /tmp/source.tar.xz > /tmp/source.tar
+          code=$?
+          set -e
+          echo "xz_status=$code"
+          test -s /tmp/source.tar
+
+      - name: Extract recovered archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/recovered
+          mkdir -p /tmp/recovered
+          tar -xf /tmp/source.tar -C /tmp/recovered
+
+      - name: Verify exact v2.3.0 standalone build
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          GAME="$(find /tmp/recovered -type f -name 'PC_LAB_v2.3.0.html' -print -quit)"
+          test -n "$GAME"
+          ACTUAL="$(sha256sum "$GAME" | awk '{print $1}')"
+          EXPECTED="706fb18c30d5055be975825d7659c55f9d79eb699d2dc062a6deb8d9936a2d27"
+          echo "actual=$ACTUAL"
+          test "$ACTUAL" = "$EXPECTED"
+          grep -qi '<!doctype html>' "$GAME"
+          rm -rf _site
+          mkdir -p _site
+          cp "$GAME" _site/index.html
+          printf 'PC LAB v2.3.0\n' > _site/version.txt
+          touch _site/.nojekyll
+
+      - name: Record verified recovery in repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'PC LAB v2.3.0 standalone verified\nSHA256 706fb18c30d5055be975825d7659c55f9d79eb699d2dc062a6deb8d9936a2d27\n' > PAGES_V230_VERIFIED.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add PAGES_V230_VERIFIED.txt
+          if ! git diff --cached --quiet; then
+            git commit -m 'ci: record verified PC LAB Pages build'
+            git push origin HEAD:main
+          fi
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy verified build
+        id: deployment
+        uses: actions/deploy-pages@v4
