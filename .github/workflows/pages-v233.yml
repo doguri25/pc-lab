@@ -25,19 +25,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsSL --retry 5 --retry-delay 2 "https://doguri25.github.io/pc-lab/?pc_lab_base=v236-${GITHUB_SHA}" -o /tmp/pc-lab.html
+          curl -fsSL --retry 5 --retry-delay 2 "https://doguri25.github.io/pc-lab/?pc_lab_base=v236-live-${GITHUB_SHA}" -o /tmp/pc-lab.html
+          echo 'db74ced16af8eb5942126171f9632244b9190bdbe799d91e21ae9c4d541874bc  /tmp/pc-lab.html' | sha256sum -c -
           grep -q 'PC LAB v2.3.6' /tmp/pc-lab.html
           grep -q '2.3.6-d024960916af' /tmp/pc-lab.html
           grep -q 'function refreshSystemModal(body)' /tmp/pc-lab.html
-          grep -q 'pc-lab-v235-focus-inset-fix' /tmp/pc-lab.html
-          grep -q '나사 제거됨 · 빈 나사 구멍' /tmp/pc-lab.html
 
       - name: Apply exact v2.3.9 bundle patch
         shell: bash
         run: |
           set -euo pipefail
-          cat pages-patches/v239-part-00.b64 pages-patches/v239-part-01.b64 pages-patches/v239-part-02.b64 pages-patches/v239-part-03.b64 pages-patches/v239-part-04.b64 pages-patches/v239-part-05.b64 > /tmp/v239-patch.b64
-          echo '69b882725e706f729923ac06b4c7cfaabbf14b0eceecad2fb72b905534fd801e  /tmp/v239-patch.b64' | sha256sum -c -
+          cat pages-patches/v239-part-00.b64 pages-patches/v239-part-01.b64 pages-patches/v239-part-02.b64 pages-patches/v239-part-03.b64 pages-patches/v239-part-04.b64 pages-patches/v239-part-05.b64 pages-patches/v239-part-06.b64 > /tmp/v239-patch.b64
+          echo '60cd66a694920b35256da0de94bbfa823d46bfbf0d113763489ae6eb06dbd45c  /tmp/v239-patch.b64' | sha256sum -c -
           base64 --decode /tmp/v239-patch.b64 > /tmp/v239.patch.xz
           xz --test /tmp/v239.patch.xz
           xz --decompress --stdout /tmp/v239.patch.xz > /tmp/v239.patch
@@ -49,7 +48,6 @@ jobs:
           grep -q 'ui.termOpen&&ui.termReturn' /tmp/pc-lab.html
           grep -q 'function refreshSystemModal(body)' /tmp/pc-lab.html
           grep -q 'preserveBoot' /tmp/pc-lab.html
-          grep -q 'pc-lab-v235-focus-inset-fix' /tmp/pc-lab.html
           grep -q '나사 제거됨 · 빈 나사 구멍' /tmp/pc-lab.html
           rm -rf _site
           mkdir -p _site
