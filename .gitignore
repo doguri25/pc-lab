@@ -1,16 +1,23 @@
 node_modules/
-dist/
-_site/
 .DS_Store
-*.log
-*.tmp
-.cache/
-coverage/
-playwright-report/
-test-results/
-.env
-.env.*
-!.env.example
-.vscode/
-.idea/
 Thumbs.db
+server.log
+*.zip
+*.log
+__pycache__/
+.pytest_cache/
+
+# Generated / local test artifacts
+dist/
+tests/**/screenshots/
+tests/**/*.png
+tests/**/*.gif
+
+# Historical standalone HTML builds kept in the working folder only.
+PC_LAB_v1.*.html
+PC_LAB_v2.0.0.html
+PC_LAB_v2.1.0.html
+PC_LAB_v2.2.0.html
+
+# Current release is intentionally tracked.
+!PC_LAB_v2.3.0.html
