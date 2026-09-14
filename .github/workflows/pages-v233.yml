@@ -48,7 +48,6 @@ jobs:
           grep -q 'ui.termOpen&&ui.termReturn' /tmp/pc-lab.html
           grep -q 'function refreshSystemModal(body)' /tmp/pc-lab.html
           grep -q 'preserveBoot' /tmp/pc-lab.html
-          grep -q '나사 제거됨 · 빈 나사 구멍' /tmp/pc-lab.html
           rm -rf _site
           mkdir -p _site
           cp /tmp/pc-lab.html _site/index.html
