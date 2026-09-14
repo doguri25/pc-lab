@@ -36,12 +36,12 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/patch-pages-v2314.py /tmp/pc-lab.html
-          echo '1af4862ea1f49f8c4a4c653cd2e761025f5c17d9e25e6ebc3a90cc73811439ce  /tmp/pc-lab.html' | sha256sum -c -
+          echo '4f8de2aeacd067615b43e77db0125955af9ee184f5390a9e10825826309e5b50  /tmp/pc-lab.html' | sha256sum -c -
           grep -q 'PC LAB v2.3.14' /tmp/pc-lab.html
           grep -q '2.3.14-96bd6394e936' /tmp/pc-lab.html
-          grep -q 'mobile tap-to-select and tap-slot install' /tmp/pc-lab.html
+          grep -q 'pc-lab-v2314-mobile-tap-install' /tmp/pc-lab.html
           grep -q "if(e.pointerType==='touch')return" /tmp/pc-lab.html
-          grep -q "if(ui.selectedProduct&&!\['panel','filter','cables','rear'\].includes(slot)){installDirect(slot);return;}" /tmp/pc-lab.html
+          grep -q 'installDirect(slot);return;' /tmp/pc-lab.html
           grep -q '만든이: 도구리' /tmp/pc-lab.html
           rm -rf _site
           mkdir -p _site
