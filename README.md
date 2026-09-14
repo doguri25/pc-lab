@@ -4,9 +4,23 @@
 
 컴퓨터 초보자가 PC 부품을 직접 조립·분해하고, 호환성·제품명·규격·성능 용도·고장 진단을 학습할 수 있는 로컬 실행형 시뮬레이션 게임입니다.
 
+## GitHub 게시 상태
+
+GitHub 연결 도구의 파일 전송 제한 때문에 전체 v2.3.0 프로젝트는 `source-archive/part-00.b64` ~ `part-09.b64`에 **손실 없는 tar.xz 스냅샷**으로 보존했습니다. 저장소 루트에는 부트스트랩 파일과 일부 핵심 모듈도 함께 있습니다.
+
+전체 원본을 복원하려면 저장소를 clone한 뒤:
+
+```sh
+python source-archive/restore_source.py
+```
+
+그러면 `restored-source/`에 v2.3.0 전체 소스·문서·테스트·릴리스 파일이 복원됩니다.
+
+자세한 내용은 [`source-archive/README.md`](source-archive/README.md)를 참고하세요.
+
 ## 실행
 
-가장 간단한 방법은 저장소 루트의 `PC_LAB_v2.3.0.html`을 Chrome/Edge 계열 브라우저로 여는 것입니다.
+복원한 프로젝트 폴더에서 가장 간단한 방법은 `PC_LAB_v2.3.0.html`을 Chrome/Edge 계열 브라우저로 여는 것입니다.
 
 개발 서버로 실행하려면 Node.js 18 이상에서:
 
@@ -38,6 +52,8 @@ npm start
 - 제조사/제품군/개별 모델/규격을 구분하는 상세 정보 구조 강화
 
 ## 개발·검수
+
+복원된 전체 프로젝트에서:
 
 ```sh
 npm test
