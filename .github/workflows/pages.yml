@@ -21,68 +21,41 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Rebuild verified standalone PC LAB bundle
+      - name: Rebuild and verify standalone PC LAB v2.3.0
         shell: bash
         run: |
           set -euo pipefail
           test -d pages-archive
 
-          # Parts 15 and 17 were safely re-uploaded as smaller fragments.
-          cat pages-archive/part-15a0.b64 pages-archive/part-15a1.b64 pages-archive/part-15a2.b64 pages-archive/part-15a3.b64 > /tmp/part-15.b64
-          cat pages-archive/part-17a0.b64 pages-archive/part-17a1.b64 pages-archive/part-17a2.b64 pages-archive/part-17a3.b64 > /tmp/part-17.b64
-
-          test "$(wc -c < /tmp/part-15.b64)" -eq 12000
-          test "$(git hash-object /tmp/part-15.b64)" = "c183c947f7f04d86cc742ebdd4fc9cebae0c1011"
-          test "$(wc -c < /tmp/part-17.b64)" -eq 12000
-          test "$(git hash-object /tmp/part-17.b64)" = "86b205cdd8c5ccfd5f283fe1817a517357c543ab"
-
           : > /tmp/pc-lab-pages.b64
-          for n in $(seq -w 0 14); do
-            cat "pages-archive/part-${n}.b64" >> /tmp/pc-lab-pages.b64
+          for n in $(seq -w 0 20); do
+            f="pages-archive/part-${n}.b64"
+            test -f "$f"
+            cat "$f" >> /tmp/pc-lab-pages.b64
           done
-          cat /tmp/part-15.b64 >> /tmp/pc-lab-pages.b64
-          cat pages-archive/part-16.b64 >> /tmp/pc-lab-pages.b64
-          cat /tmp/part-17.b64 >> /tmp/pc-lab-pages.b64
-          cat pages-archive/part-18a0.b64 >> /tmp/pc-lab-pages.b64
           tr -d '\r\n\t ' < /tmp/pc-lab-pages.b64 > /tmp/pc-lab-pages.clean.b64
           mv /tmp/pc-lab-pages.clean.b64 /tmp/pc-lab-pages.b64
 
           chars=$(wc -c < /tmp/pc-lab-pages.b64)
-          echo "Canonical Base64 chars: $chars"
-          mod=$((chars % 4))
-          if [ "$mod" -eq 2 ]; then
-            printf '==' >> /tmp/pc-lab-pages.b64
-          elif [ "$mod" -eq 3 ]; then
-            printf '=' >> /tmp/pc-lab-pages.b64
-          elif [ "$mod" -eq 1 ]; then
-            echo 'Invalid Base64 length: one data character is missing.' >&2
-            exit 1
-          fi
+          echo "Base64 chars: $chars"
+          test "$chars" -eq 243136
+          echo "026ac6f228345ef8e26b70ddbd307980568e3f115fd93d75009838fbbd3e9696  /tmp/pc-lab-pages.b64" | sha256sum -c -
 
           base64 --decode /tmp/pc-lab-pages.b64 > /tmp/pc-lab-pages.xz
+          echo "a761d59037e27c11426c1fa2ac6afe0537a9991d1e64295a255f49a9471e5660  /tmp/pc-lab-pages.xz" | sha256sum -c -
           xz --test /tmp/pc-lab-pages.xz
-          xz --decompress --stdout /tmp/pc-lab-pages.xz > /tmp/pc-lab-pages.payload
+          xz --decompress --stdout /tmp/pc-lab-pages.xz > /tmp/pc-lab-pages.html
 
-          rm -rf _site /tmp/pc-lab-pages-extracted
+          bytes=$(wc -c < /tmp/pc-lab-pages.html)
+          echo "HTML bytes: $bytes"
+          test "$bytes" -eq 755018
+          echo "706fb18c30d5055be975825d7659c55f9d79eb699d2dc062a6deb8d9936a2d27  /tmp/pc-lab-pages.html" | sha256sum -c -
+          grep -q 'PC LAB' /tmp/pc-lab-pages.html
+          grep -q 'v2.3.0' /tmp/pc-lab-pages.html
+
+          rm -rf _site
           mkdir -p _site
-          if head -c 256 /tmp/pc-lab-pages.payload | grep -Eqi '<!doctype html|<html'; then
-            cp /tmp/pc-lab-pages.payload _site/index.html
-          elif tar -tf /tmp/pc-lab-pages.payload >/dev/null 2>&1; then
-            mkdir -p /tmp/pc-lab-pages-extracted
-            tar -xf /tmp/pc-lab-pages.payload -C /tmp/pc-lab-pages-extracted
-            candidate=$(find /tmp/pc-lab-pages-extracted -type f \( -name 'PC_LAB_v2.3.0.html' -o -name 'index.html' \) | head -n 1)
-            test -n "${candidate:-}"
-            cp "$candidate" _site/index.html
-          else
-            echo 'Decoded payload is neither HTML nor TAR.' >&2
-            exit 1
-          fi
-
-          bytes=$(wc -c < _site/index.html)
-          echo "Generated index.html: $bytes bytes"
-          test "$bytes" -ge 500000
-          grep -q 'PC LAB' _site/index.html
-          grep -q 'v2.3.0' _site/index.html
+          cp /tmp/pc-lab-pages.html _site/index.html
           printf 'PC LAB v2.3.0\n' > _site/version.txt
           touch _site/.nojekyll
 
