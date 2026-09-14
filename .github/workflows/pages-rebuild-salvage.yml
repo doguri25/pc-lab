@@ -1,0 +1,135 @@
+name: Recover, rebuild and deploy PC LAB v2.3.0
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/pages-rebuild-salvage.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-v230-rebuild
+  cancel-in-progress: true
+
+env:
+  EXPECTED_HTML_SHA: 706fb18c30d5055be975825d7659c55f9d79eb699d2dc062a6deb8d9936a2d27
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Decode recoverable XZ bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import base64
+          parts = sorted(Path('source-archive').glob('part-*.b64'))
+          if not parts:
+              raise SystemExit('No source archive parts')
+          text = ''.join(''.join(p.read_text().split()) for p in parts)
+          usable = text[:len(text) - (len(text) % 4)]
+          Path('/tmp/source.tar.xz').write_bytes(base64.b64decode(usable))
+          print('parts=', len(parts), 'base64_chars=', len(usable))
+          PY
+
+      - name: Salvage TAR payload even with broken XZ footer
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          xz -dc /tmp/source.tar.xz > /tmp/source.tar
+          rc=$?
+          set -e
+          echo "xz_exit=$rc tar_bytes=$(wc -c < /tmp/source.tar)"
+          test -s /tmp/source.tar
+          rm -rf /tmp/recovered
+          mkdir -p /tmp/recovered
+          set +e
+          tar -xf /tmp/source.tar -C /tmp/recovered
+          trc=$?
+          set -e
+          echo "tar_exit=$trc"
+          find /tmp/recovered -maxdepth 3 -type f | sort | head -100
+
+      - name: Select exact standalone or rebuild from recovered source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf _site
+          mkdir -p _site
+          GAME="$(find /tmp/recovered -type f -name 'PC_LAB_v2.3.0.html' -print -quit || true)"
+          if [ -n "$GAME" ]; then
+            SHA="$(sha256sum "$GAME" | awk '{print $1}')"
+            echo "recovered standalone sha=$SHA"
+            if [ "$SHA" = "$EXPECTED_HTML_SHA" ]; then
+              cp "$GAME" _site/index.html
+            fi
+          fi
+
+          if [ ! -f _site/index.html ]; then
+            BUILD="$(find /tmp/recovered -type f -name build.cjs -print -quit || true)"
+            if [ -z "$BUILD" ]; then
+              echo 'No complete standalone and no build.cjs recovered' >&2
+              exit 1
+            fi
+            ROOT="$(dirname "$BUILD")"
+            echo "rebuilding from $ROOT"
+            cd "$ROOT"
+            node build.cjs
+            CANDIDATE="$(find . -maxdepth 3 -type f -name 'PC_LAB_v2.3.0.html' -print -quit || true)"
+            if [ -z "$CANDIDATE" ]; then
+              echo 'Rebuild completed but standalone v2.3.0 HTML not found' >&2
+              find . -maxdepth 3 -type f | sort | tail -100
+              exit 1
+            fi
+            SHA="$(sha256sum "$CANDIDATE" | awk '{print $1}')"
+            echo "rebuilt standalone sha=$SHA"
+            test "$SHA" = "$EXPECTED_HTML_SHA"
+            cp "$CANDIDATE" "$GITHUB_WORKSPACE/_site/index.html"
+            cd "$GITHUB_WORKSPACE"
+          fi
+
+          echo "$EXPECTED_HTML_SHA  _site/index.html" | sha256sum -c -
+          grep -qi '<!doctype html>' _site/index.html
+          printf 'PC LAB v2.3.0\n' > _site/version.txt
+          touch _site/.nojekyll
+
+      - name: Record verified build
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'PC LAB v2.3.0 verified for GitHub Pages\nSHA256 %s\n' "$EXPECTED_HTML_SHA" > PAGES_V230_VERIFIED.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add PAGES_V230_VERIFIED.txt
+          if ! git diff --cached --quiet; then
+            git commit -m 'ci: record verified Pages build'
+            git push origin HEAD:main
+          fi
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy verified PC LAB
+        id: deployment
+        uses: actions/deploy-pages@v4
