@@ -1,4 +1,4 @@
-name: Deploy PC LAB v2.3.13 to GitHub Pages
+name: Deploy PC LAB v2.3.14 to GitHub Pages
 
 on:
   push:
@@ -21,35 +21,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Fetch current verified v2.3.12 Pages bundle
+      - name: Fetch current verified v2.3.13 Pages bundle
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsSL --retry 5 --retry-delay 2 "https://doguri25.github.io/pc-lab/?pc_lab_base=v2312-${GITHUB_SHA}" -o /tmp/pc-lab.html
-          grep -q 'PC LAB v2.3.12' /tmp/pc-lab.html
-          grep -q '2.3.12-8f23588a26e1' /tmp/pc-lab.html
-          grep -q '만든이: 도구리' /tmp/pc-lab.html
-          grep -q 'RAM 슬롯 구역' /tmp/pc-lab.html
-          grep -q 'ui.termOpen&&ui.termReturn' /tmp/pc-lab.html
-          grep -q 'preserveBoot' /tmp/pc-lab.html
-
-      - name: Apply v2.3.13 mobile input and history patch
-        shell: bash
-        run: |
-          set -euo pipefail
-          python scripts/patch-pages-v2313.py /tmp/pc-lab.html
+          curl -fsSL --retry 5 --retry-delay 2 "https://doguri25.github.io/pc-lab/?pc_lab_base=v2313-${GITHUB_SHA}" -o /tmp/pc-lab.html
           grep -q 'PC LAB v2.3.13' /tmp/pc-lab.html
           grep -q '2.3.13-1d813b29baec' /tmp/pc-lab.html
-          grep -q 'pc-lab-v2313-mobile-input-fix' /tmp/pc-lab.html
           grep -q "APP_HISTORY_KEY='pc-lab-route'" /tmp/pc-lab.html
-          grep -q "window.addEventListener('popstate'" /tmp/pc-lab.html
           grep -q '만든이: 도구리' /tmp/pc-lab.html
-          grep -q 'RAM 슬롯 구역' /tmp/pc-lab.html
-          grep -q 'preserveBoot' /tmp/pc-lab.html
+
+      - name: Apply v2.3.14 mobile tap install patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/patch-pages-v2314.py /tmp/pc-lab.html
+          echo '1af4862ea1f49f8c4a4c653cd2e761025f5c17d9e25e6ebc3a90cc73811439ce  /tmp/pc-lab.html' | sha256sum -c -
+          grep -q 'PC LAB v2.3.14' /tmp/pc-lab.html
+          grep -q '2.3.14-96bd6394e936' /tmp/pc-lab.html
+          grep -q 'mobile tap-to-select and tap-slot install' /tmp/pc-lab.html
+          grep -q "if(e.pointerType==='touch')return" /tmp/pc-lab.html
+          grep -q "if(ui.selectedProduct&&!\['panel','filter','cables','rear'\].includes(slot)){installDirect(slot);return;}" /tmp/pc-lab.html
+          grep -q '만든이: 도구리' /tmp/pc-lab.html
           rm -rf _site
           mkdir -p _site
           cp /tmp/pc-lab.html _site/index.html
-          printf 'PC LAB v2.3.13\nBuild 2.3.13-1d813b29baec\n만든이: 도구리\n' > _site/version.txt
+          printf 'PC LAB v2.3.14\nBuild 2.3.14-96bd6394e936\n만든이: 도구리\n' > _site/version.txt
           touch _site/.nojekyll
 
       - name: Configure Pages
