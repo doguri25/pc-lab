@@ -1,0 +1,30 @@
+name: Verify PC LAB Pages archive parts
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'pages-archive/**'
+      - '.github/workflows/verify-pages-parts.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify reconstructed part 15 and part 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat pages-archive/part-15a0.b64 pages-archive/part-15a1.b64 pages-archive/part-15a2.b64 pages-archive/part-15a3.b64 > /tmp/part-15.b64
+          test "$(wc -c < /tmp/part-15.b64)" -eq 12000
+          test "$(git hash-object /tmp/part-15.b64)" = "c183c947f7f04d86cc742ebdd4fc9cebae0c1011"
+          cat pages-archive/part-17a0.b64 pages-archive/part-17a1.b64 pages-archive/part-17a2.b64 pages-archive/part-17a3.b64 > /tmp/part-17.b64
+          test "$(wc -c < /tmp/part-17.b64)" -eq 12000
+          test "$(git hash-object /tmp/part-17.b64)" = "86b205cdd8c5ccfd5f283fe1817a517357c543ab"
+          echo 'part15=OK'
+          echo 'part17=OK'
