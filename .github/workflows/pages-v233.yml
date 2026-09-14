@@ -1,4 +1,4 @@
-name: Deploy PC LAB v2.3.3 to GitHub Pages
+name: Deploy PC LAB v2.3.4 to GitHub Pages
 
 on:
   push:
@@ -21,27 +21,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Fetch current verified v2.3.2 Pages bundle
+      - name: Fetch current verified v2.3.3 Pages bundle
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsSL --retry 5 --retry-delay 2 'https://doguri25.github.io/pc-lab/?pc_lab_base=v232' -o /tmp/pc-lab.html
-          grep -q 'PC LAB v2.3.2' /tmp/pc-lab.html
-          grep -q '2.3.2-b622600c7980' /tmp/pc-lab.html
-
-      - name: Apply v2.3.3 patch
-        shell: bash
-        run: |
-          set -euo pipefail
-          python scripts/patch-pages-v233.py /tmp/pc-lab.html
+          curl -fsSL --retry 5 --retry-delay 2 "https://doguri25.github.io/pc-lab/?pc_lab_base=v233-${GITHUB_SHA}" -o /tmp/pc-lab.html
           grep -q 'PC LAB v2.3.3' /tmp/pc-lab.html
           grep -q '2.3.3-2b16f203e5d9' /tmp/pc-lab.html
-          grep -q 'panelCamera' /tmp/pc-lab.html
-          grep -q 'repeat(auto-fill,minmax(155px,1fr))' /tmp/pc-lab.html
+
+      - name: Apply v2.3.4 patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/patch-pages-v234.py /tmp/pc-lab.html
+          grep -q 'PC LAB v2.3.4' /tmp/pc-lab.html
+          grep -q '2.3.4-3f78610b1dc0' /tmp/pc-lab.html
+          grep -q 'precision-empty-hole' /tmp/pc-lab.html
+          grep -q 'pc-lab-v234-focus-fix' /tmp/pc-lab.html
+          if grep -q 'translate(36 -59) rotate(-24 125 132)' /tmp/pc-lab.html; then
+            echo 'Old released-screw lens representation is still present.' >&2
+            exit 1
+          fi
           rm -rf _site
           mkdir -p _site
           cp /tmp/pc-lab.html _site/index.html
-          printf 'PC LAB v2.3.3\n' > _site/version.txt
+          printf 'PC LAB v2.3.4\n' > _site/version.txt
           touch _site/.nojekyll
 
       - name: Configure Pages
