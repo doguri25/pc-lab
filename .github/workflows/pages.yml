@@ -27,8 +27,21 @@ jobs:
           set -euo pipefail
           test -d pages-archive
 
+          # part-15 was damaged during the original connector upload.
+          # Its four verified 3 KB fragments are intact and reconstruct the
+          # canonical 12 KB part exactly.
+          cat pages-archive/part-15a0.b64 pages-archive/part-15a1.b64 pages-archive/part-15a2.b64 pages-archive/part-15a3.b64 > /tmp/part-15.b64
+          test "$(wc -c < /tmp/part-15.b64)" -eq 12000
+          test "$(git hash-object /tmp/part-15.b64)" = "c183c947f7f04d86cc742ebdd4fc9cebae0c1011"
+
           : > /tmp/pc-lab-pages.b64
-          for n in $(seq -w 0 20); do
+          for n in $(seq -w 0 14); do
+            f="pages-archive/part-${n}.b64"
+            test -f "$f"
+            cat "$f" >> /tmp/pc-lab-pages.b64
+          done
+          cat /tmp/part-15.b64 >> /tmp/pc-lab-pages.b64
+          for n in $(seq -w 16 20); do
             f="pages-archive/part-${n}.b64"
             test -f "$f"
             cat "$f" >> /tmp/pc-lab-pages.b64
