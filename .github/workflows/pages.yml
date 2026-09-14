@@ -1,0 +1,65 @@
+name: Deploy PC LAB to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore complete v2.3.0 source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          python source-archive/restore_source.py
+
+      - name: Prepare Pages artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf _site
+          mkdir -p _site
+          if [ -f restored-source/PC_LAB_v2.3.0.html ]; then
+            cp restored-source/PC_LAB_v2.3.0.html _site/index.html
+          elif [ -f PC_LAB_v2.3.0.html ]; then
+            cp PC_LAB_v2.3.0.html _site/index.html
+          else
+            echo "PC_LAB_v2.3.0.html not found after restore" >&2
+            find . -maxdepth 3 -type f | sort | head -200
+            exit 1
+          fi
+          printf 'PC LAB v2.3.0\n' > _site/version.txt
+          touch _site/.nojekyll
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
