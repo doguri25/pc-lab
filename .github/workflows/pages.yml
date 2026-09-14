@@ -21,27 +21,53 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Restore complete v2.3.0 source snapshot
+      - name: Rebuild standalone PC LAB from verified Pages archive
         shell: bash
         run: |
           set -euo pipefail
-          python source-archive/restore_source.py
-
-      - name: Prepare Pages artifact
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf _site
-          mkdir -p _site
-          if [ -f restored-source/PC_LAB_v2.3.0.html ]; then
-            cp restored-source/PC_LAB_v2.3.0.html _site/index.html
-          elif [ -f PC_LAB_v2.3.0.html ]; then
-            cp PC_LAB_v2.3.0.html _site/index.html
-          else
-            echo "PC_LAB_v2.3.0.html not found after restore" >&2
-            find . -maxdepth 3 -type f | sort | head -200
+          test -d pages-archive
+          count=$(find pages-archive -maxdepth 1 -type f -name 'part-*.b64' | wc -l | tr -d ' ')
+          echo "Pages archive parts: $count"
+          if [ "$count" -ne 16 ]; then
+            echo "Expected exactly 16 Pages archive parts, found $count" >&2
+            find pages-archive -maxdepth 1 -type f -name 'part-*.b64' -printf '%f %s bytes\n' | sort
             exit 1
           fi
+
+          cat pages-archive/part-*.b64 | tr -d '\r\n\t ' > /tmp/pc-lab-pages.b64
+          echo "Base64 chars: $(wc -c < /tmp/pc-lab-pages.b64)"
+          base64 --decode /tmp/pc-lab-pages.b64 > /tmp/pc-lab-pages.xz
+          xz --test /tmp/pc-lab-pages.xz
+          xz --decompress --stdout /tmp/pc-lab-pages.xz > /tmp/pc-lab-pages.payload
+
+          rm -rf _site /tmp/pc-lab-pages-extracted
+          mkdir -p _site
+
+          if head -c 256 /tmp/pc-lab-pages.payload | grep -Eqi '<!doctype html|<html'; then
+            cp /tmp/pc-lab-pages.payload _site/index.html
+          elif tar -tf /tmp/pc-lab-pages.payload >/dev/null 2>&1; then
+            mkdir -p /tmp/pc-lab-pages-extracted
+            tar -xf /tmp/pc-lab-pages.payload -C /tmp/pc-lab-pages-extracted
+            candidate=$(find /tmp/pc-lab-pages-extracted -type f \( -name 'PC_LAB_v2.3.0.html' -o -name 'index.html' \) | head -n 1)
+            if [ -z "${candidate:-}" ]; then
+              echo 'No HTML entry found inside Pages archive.' >&2
+              exit 1
+            fi
+            cp "$candidate" _site/index.html
+          else
+            echo 'Pages archive decoded, but payload is neither HTML nor TAR.' >&2
+            file /tmp/pc-lab-pages.payload || true
+            exit 1
+          fi
+
+          bytes=$(wc -c < _site/index.html)
+          echo "Generated index.html: $bytes bytes"
+          if [ "$bytes" -lt 500000 ]; then
+            echo 'Generated HTML is unexpectedly small.' >&2
+            exit 1
+          fi
+          grep -q 'PC LAB' _site/index.html
+          grep -q 'v2.3.0' _site/index.html
           printf 'PC LAB v2.3.0\n' > _site/version.txt
           touch _site/.nojekyll
 
