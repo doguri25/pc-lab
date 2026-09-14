@@ -1,0 +1,24 @@
+from pathlib import Path
+import json, sys
+path=Path(sys.argv[1] if len(sys.argv)>1 else '/tmp/pc-lab.html')
+s=path.read_text()
+def rep(old,new,name):
+    global s
+    n=s.count(old)
+    if n!=1: raise SystemExit(f'{name}: expected 1 match, got {n}')
+    s=s.replace(old,new,1)
+rep('<title>PC LAB v2.3.12 — 컴퓨터 조립 시뮬레이터</title><meta name="pc-lab-version" content="2.3.12"><meta name="pc-lab-build" content="2.3.12-8f23588a26e1">','<title>PC LAB v2.3.13 — 컴퓨터 조립 시뮬레이터</title><meta name="pc-lab-version" content="2.3.13"><meta name="pc-lab-build" content="2.3.13-1d813b29baec">','release identity')
+rep("function rememberLessonResume(id){ui.activeLesson=id||null;try{if(id)sessionStorage.setItem(lessonResumeKey,id);else sessionStorage.removeItem(lessonResumeKey);}catch{}try{const u=new URL(location.href);if(id)u.hash='lesson='+encodeURIComponent(id);else if(u.hash.startsWith('#lesson='))u.hash='';history.replaceState(null,'',u.href);}catch{}}","function rememberLessonResume(id){ui.activeLesson=id||null;try{if(id)sessionStorage.setItem(lessonResumeKey,id);else sessionStorage.removeItem(lessonResumeKey);}catch{}try{const u=new URL(location.href);if(id)u.hash='lesson='+encodeURIComponent(id);else if(u.hash.startsWith('#lesson='))u.hash='';history.replaceState(history.state,'',u.href);}catch{}}",'lesson history preservation')
+rep("function navigate(page){captureScrollState(lastRenderedPage);ui.focus=null;ui.precision=null;ui.cable=null;ui.page=page;ui.mobile='details';save();render();ui.scrollMemory[page+':window']={top:0,left:0};window.scrollTo(0,0);}","const APP_HISTORY_KEY='pc-lab-route';\nfunction appHistoryState(page=ui.page){return {pcLab:true,key:APP_HISTORY_KEY,page};}\nfunction writeAppHistory(page,mode='push'){try{const state=appHistoryState(page);if(mode==='replace')history.replaceState(state,'',location.href);else history.pushState(state,'',location.href);}catch{}}\nfunction navigate(page,{historyMode='push',resetScroll=true}={}){const from=ui.page;captureScrollState(lastRenderedPage);ui.focus=null;ui.precision=null;ui.cable=null;ui.page=page;ui.mobile='details';save();if(historyMode==='replace')writeAppHistory(page,'replace');else if(historyMode==='push'&&page!==from)writeAppHistory(page,'push');render();if(resetScroll){ui.scrollMemory[page+':window']={top:0,left:0};window.scrollTo(0,0);}}",'SPA browser history')
+needle="window.addEventListener('storage',event=>{if(store.external(event.key))showStorageConflict();});"
+rep(needle,"window.addEventListener('popstate',event=>{const state=event.state;if(!state?.pcLab||state.key!==APP_HISTORY_KEY)return;const page=state.page;if(!['home','work','catalog','jobs','storage','performance','learn'].includes(page))return;if(ui.busy)return;ui.headerMenu=false;if(ui.modal)closeModal();ui.termOpen=false;ui.termReturn=null;navigate(page,{historyMode:'none',resetScroll:false});});\n"+needle,'browser back handler')
+rep("restoreWorkspace();SFX.configure(profile.settings);document.title='PC LAB v'+R.version+' — 컴퓨터 조립 시뮬레이터';const resumeLesson=readLessonResume();if(resumeLesson)ui.page='learn';render();if(resumeLesson)setTimeout(()=>lessonDialog(resumeLesson),0);","restoreWorkspace();SFX.configure(profile.settings);document.title='PC LAB v'+R.version+' — 컴퓨터 조립 시뮬레이터';const resumeLesson=readLessonResume();if(resumeLesson)ui.page='learn';writeAppHistory(ui.page,'replace');render();if(resumeLesson)setTimeout(()=>lessonDialog(resumeLesson),0);",'initial route state')
+style='''<style id="pc-lab-v2313-mobile-input-fix">\n@media(max-width:650px){.studio-stage.has-focus .direct-canvas>.hands-scene,.studio-stage.has-focus .direct-canvas>.hands-scene [data-action="physical-slot"]{touch-action:none!important;-webkit-user-select:none;user-select:none}}\n</style>'''
+s=s.replace('</head>',style+'</head>',1)
+entry={'version':'2.3.13','date':'2026-09-14','timezone':'Asia/Seoul','channel':'stable-local','title':'모바일 확대 작업 드래그와 브라우저 뒤로가기 개선','changes':['모바일 확대 작업에서 손가락 드래그가 스크롤 제스처에 막히지 않도록 수정','모바일 브라우저 뒤로가기가 이전 PC LAB 화면으로 복귀하도록 내부 화면 이동을 히스토리에 기록','뒤로가기 복귀 시 이전 화면 스크롤 위치를 가능한 한 유지','만든이: 도구리 표기와 기존 모바일 레이아웃 개선 유지'],'scopeNote':'모바일 입력과 앱 내부 화면 이동 방식만 개선하며 PC 조립 규칙·부품 데이터·학습 내용은 변경하지 않습니다.'}
+marker='</script><script>\n/* PC LAB content pack 0.1.0.'
+j=json.dumps(entry,ensure_ascii=False,separators=(',',':'))
+inject="</script><script>\nwindow.PCRelease.version='2.3.13';window.PCRelease.date='2026-09-14';window.PCRelease.buildId='2.3.13-1d813b29baec';window.PCRelease.title="+json.dumps(entry['title'],ensure_ascii=False)+";window.PCRelease.changes="+json.dumps(entry['changes'],ensure_ascii=False)+";window.PCRelease.scopeNote="+json.dumps(entry['scopeNote'],ensure_ascii=False)+";window.PCRelease.history=["+j+",...window.PCRelease.history];\n</script><script>\n/* PC LAB content pack 0.1.0."
+if marker not in s: raise SystemExit('release marker missing')
+s=s.replace(marker,inject,1)
+path.write_text(s)
