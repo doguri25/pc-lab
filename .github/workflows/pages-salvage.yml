@@ -1,0 +1,97 @@
+name: Deploy PC LAB v2.3.0 from verified salvage
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/pages-salvage.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-salvage
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Recover XZ payload without damaged footer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import base64
+          parts = sorted(Path('source-archive').glob('part-*.b64'))
+          if not parts:
+              raise SystemExit('source archive parts missing')
+          b64 = ''.join(''.join(p.read_text().split()) for p in parts)
+          # Decode every complete Base64 quartet. The interrupted upload only
+          # damaged the very end; XZ can emit recovered TAR bytes before the
+          # missing footer is reported.
+          b64 = b64[:len(b64) - (len(b64) % 4)]
+          Path('/tmp/source.tar.xz').write_bytes(base64.b64decode(b64))
+          print('parts=', len(parts), 'b64=', len(b64))
+          PY
+
+          # Keep any decompressed output even if xz reports a missing footer.
+          set +e
+          xz -dc /tmp/source.tar.xz > /tmp/source.tar
+          XZ_STATUS=$?
+          set -e
+          echo "xz_status=$XZ_STATUS"
+          test -s /tmp/source.tar
+
+      - name: Extract recovered TAR
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/recovered
+          mkdir -p /tmp/recovered
+          # A complete TAR normally remains extractable even when only the XZ
+          # stream footer is missing.
+          tar -xf /tmp/source.tar -C /tmp/recovered
+          echo 'Recovered top-level files:'
+          find /tmp/recovered -maxdepth 2 -type f | head -40
+
+      - name: Locate and verify exact standalone build
+        shell: bash
+        run: |
+          set -euo pipefail
+          GAME="$(find /tmp/recovered -type f -name 'PC_LAB_v2.3.0.html' -print -quit)"
+          test -n "$GAME"
+          echo "game=$GAME"
+          echo "706fb18c30d5055be975825d7659c55f9d79eb699d2dc062a6deb8d9936a2d27  $GAME" | sha256sum -c -
+          grep -qi '<!doctype html>' "$GAME"
+          rm -rf _site
+          mkdir -p _site
+          cp "$GAME" _site/index.html
+          printf 'PC LAB v2.3.0\n' > _site/version.txt
+          touch _site/.nojekyll
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload verified Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
