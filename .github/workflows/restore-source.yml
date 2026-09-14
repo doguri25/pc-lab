@@ -1,0 +1,67 @@
+name: Restore PC LAB source for Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/restore-source.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Restore complete v2.3.0 source snapshot
+        run: python source-archive/restore_source.py
+
+      - name: Locate restored project root
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f restored-source/index.html ]; then
+            SRC='restored-source'
+          elif [ -f restored-source/pc-lab-v2.3.0/index.html ]; then
+            SRC='restored-source/pc-lab-v2.3.0'
+          else
+            SRC="$(find restored-source -mindepth 1 -maxdepth 2 -type f -name index.html -printf '%h\n' | head -n 1)"
+          fi
+          if [ -z "${SRC:-}" ] || [ ! -f "$SRC/index.html" ]; then
+            echo 'Could not locate restored index.html' >&2
+            find restored-source -maxdepth 3 -type f | sort | head -200
+            exit 1
+          fi
+          echo "SRC=$SRC" >> "$GITHUB_ENV"
+          echo "Restored project root: $SRC"
+
+      - name: Publish restored source to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          rsync -a \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='source-archive/' \
+            "$SRC/" ./
+          rm -rf restored-source
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'Source already restored; no commit needed.'
+            exit 0
+          fi
+          git commit -m 'fix: restore complete v2.3.0 source for GitHub Pages'
+          git push origin HEAD:main
