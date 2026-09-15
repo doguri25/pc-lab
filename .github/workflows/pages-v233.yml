@@ -1,4 +1,4 @@
-name: Deploy PC LAB v2.3.15 to GitHub Pages
+name: Deploy PC LAB v2.3.16 to GitHub Pages
 
 on:
   push:
@@ -21,34 +21,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Fetch current verified v2.3.14 Pages bundle
+      - name: Fetch current v2.3.15 Pages bundle
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsSL --retry 5 --retry-delay 2 "https://doguri25.github.io/pc-lab/?pc_lab_base=v2314-${GITHUB_SHA}" -o /tmp/pc-lab.html
-          echo '4f8de2aeacd067615b43e77db0125955af9ee184f5390a9e10825826309e5b50  /tmp/pc-lab.html' | sha256sum -c -
-          grep -q 'PC LAB v2.3.14' /tmp/pc-lab.html
-          grep -q '2.3.14-96bd6394e936' /tmp/pc-lab.html
-          grep -q 'pc-lab-v2314-mobile-tap-install' /tmp/pc-lab.html
-          grep -q '만든이: 도구리' /tmp/pc-lab.html
-
-      - name: Apply v2.3.15 first-run tutorial patch
-        shell: bash
-        run: |
-          set -euo pipefail
-          python scripts/patch-pages-v2315.py /tmp/pc-lab.html
-          echo 'b8fd7d8f3d6e3660b1407bf6383ec6c7a705109a97050f18ac2c8d4d80c9c36f  /tmp/pc-lab.html' | sha256sum -c -
+          curl -fsSL --retry 5 --retry-delay 2 "https://doguri25.github.io/pc-lab/?pc_lab_base=v2315-hotfix-${GITHUB_SHA}" -o /tmp/pc-lab.html
           grep -q 'PC LAB v2.3.15' /tmp/pc-lab.html
           grep -q '2.3.15-1ed8f3203523' /tmp/pc-lab.html
           grep -q 'PC LAB 처음 튜토리얼' /tmp/pc-lab.html
-          grep -q 'pc-lab:onboarding:v1' /tmp/pc-lab.html
-          grep -q '부품 선택 → 슬롯 터치' /tmp/pc-lab.html
-          grep -q '처음 튜토리얼 다시 보기' /tmp/pc-lab.html
+          grep -q '만든이: 도구리' /tmp/pc-lab.html
+
+      - name: Apply v2.3.16 black-screen hotfix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/patch-pages-v2316.py /tmp/pc-lab.html
+          echo 'f993991f3edb2e8b565ae0455d08f7f2ec4959e0e9b4bb4b5afe9d6a4ddb84fd  /tmp/pc-lab.html' | sha256sum -c -
+          grep -q 'PC LAB v2.3.16' /tmp/pc-lab.html
+          grep -q '2.3.16-d5ebb8108e4e' /tmp/pc-lab.html
+          grep -q '시작 튜토리얼 배포 검정 화면 긴급 수정' /tmp/pc-lab.html
+          grep -q 'const ONBOARDING_KEY' /tmp/pc-lab.html
+          grep -q 'PC LAB 처음 튜토리얼' /tmp/pc-lab.html
           grep -q '만든이: 도구리' /tmp/pc-lab.html
           rm -rf _site
           mkdir -p _site
           cp /tmp/pc-lab.html _site/index.html
-          printf 'PC LAB v2.3.15\nBuild 2.3.15-1ed8f3203523\n만든이: 도구리\n' > _site/version.txt
+          printf 'PC LAB v2.3.16\nBuild 2.3.16-d5ebb8108e4e\n만든이: 도구리\n' > _site/version.txt
           touch _site/.nojekyll
 
       - name: Configure Pages
